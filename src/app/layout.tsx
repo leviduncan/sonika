@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://trysonika.com";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "Sonika | Voice infrastructure for marketing agencies",
   description:
     "Sonika is voice infrastructure built for marketing agencies. Building in public.",
@@ -11,7 +14,7 @@ export const metadata: Metadata = {
     type: "website",
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
   },
 };
 
