@@ -1,3 +1,5 @@
+import { isSignupOpen } from "@/lib/flags";
+
 function Waveform() {
   const bars = [0.4, 0.7, 0.9, 0.55, 1, 0.75, 0.45, 0.85, 0.6, 0.95, 0.5, 0.8, 0.35, 0.7, 0.9];
   return (
@@ -18,6 +20,7 @@ function Waveform() {
 }
 
 export default function Hero() {
+  const signupOpen = isSignupOpen();
   return (
     <section className="relative z-10 mx-auto flex max-w-5xl flex-col items-center px-6 pt-16 pb-24 text-center md:pt-28">
       <div className="mb-10 inline-flex items-center gap-3 rounded-full border border-border bg-muted/30 px-4 py-1.5 backdrop-blur">
@@ -45,21 +48,41 @@ export default function Hero() {
       </p>
 
       <div className="mt-12 flex flex-col items-center gap-4 sm:flex-row">
-        <a
-          href="https://x.com/trysonika"
-          target="_blank"
-          rel="noreferrer"
-          className="glow-accent group inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 font-mono text-sm uppercase tracking-[0.15em] text-accent-foreground transition-transform hover:-translate-y-0.5"
-        >
-          Follow the build
-          <span className="transition-transform group-hover:translate-x-0.5">→</span>
-        </a>
-        <a
-          href="mailto:hello@trysonika.com"
-          className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground transition-colors hover:text-foreground"
-        >
-          hello@trysonika.com
-        </a>
+        {signupOpen ? (
+          <>
+            <a
+              href="/signup"
+              className="glow-accent group inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 font-mono text-sm uppercase tracking-[0.15em] text-accent-foreground transition-transform hover:-translate-y-0.5"
+            >
+              Get started
+              <span className="transition-transform group-hover:translate-x-0.5">→</span>
+            </a>
+            <a
+              href="/login"
+              className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Log in
+            </a>
+          </>
+        ) : (
+          <>
+            <a
+              href="https://x.com/trysonika"
+              target="_blank"
+              rel="noreferrer"
+              className="glow-accent group inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 font-mono text-sm uppercase tracking-[0.15em] text-accent-foreground transition-transform hover:-translate-y-0.5"
+            >
+              Follow the build
+              <span className="transition-transform group-hover:translate-x-0.5">→</span>
+            </a>
+            <a
+              href="mailto:hello@trysonika.com"
+              className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground transition-colors hover:text-foreground"
+            >
+              hello@trysonika.com
+            </a>
+          </>
+        )}
       </div>
     </section>
   );
