@@ -6,6 +6,15 @@ This is a standalone status snapshot written to be readable without repo access
 (safe to paste into Claude Chat). It covers what Sonika is, what's built and
 verified, what remains, and the exact steps to take it live.
 
+> ## 🟢 STATUS: SOFT-LAUNCHED & LIVE
+> Sonika is deployed and working in production at **https://trysonika.com**.
+> A real agency account has signed up, been auto-provisioned an agency +
+> owner profile, and reached the dashboard — proving the full multi-tenant
+> backend works live. **Steps 1–3 of the go-live checklist are done.**
+> The app currently runs with **provisioning and billing in mock mode**
+> (nothing spends money), and the public landing page is still **parked**
+> (signups by direct URL only) until the front door is opened (Step 4).
+
 ---
 
 ## 1. What Sonika is
@@ -35,10 +44,17 @@ everything from one dashboard and resell to clients at their own margin.
 
 ## 2. Where we are right now
 
-**The full MVP application code is committed and pushed to GitHub** (`origin/main`,
-commit `149c3ef`). Before this, only the marketing landing page was in the repo;
-the entire app (~3,600 lines) was sitting uncommitted on the local machine. It's
-now version-controlled and intentional.
+**The full MVP is committed, pushed, deployed, and verified working in production.**
+The app is live at **https://trysonika.com** on Vercel, backed by a production
+Supabase project (`sonika-os-db`). Before this work, only the marketing landing
+page was in the repo; the entire app (~3,600 lines) was sitting uncommitted on the
+local machine. It's now version-controlled, reviewed, and running live.
+
+### Proven working in production (verified 2026-07-01)
+- ✅ **Vercel deploy** connected to the GitHub repo; pushes to `main` auto-deploy.
+- ✅ **Landing page** renders at trysonika.com (currently in parked/teaser mode by design).
+- ✅ **Prod Supabase** connected with valid keys; the 3 migrations are applied (all 5 tables exist).
+- ✅ **Signup works end-to-end** — a real account ("Levi Marketing") signed up, the DB trigger auto-created the agency + owner profile, the auth session held, and the dashboard rendered its (empty) RLS-scoped client list.
 
 ### What's built and in the repo
 - **Multi-tenant database schema** — agencies, profiles, sub-accounts (end-clients), seats (one provisioned voice agent = the billing unit), call logs. Tenant isolation enforced by Postgres Row-Level Security keyed on `agency_id`.
@@ -60,12 +76,18 @@ now version-controlled and intentional.
 
 ---
 
-## 3. Important nuance: "pushed to GitHub" ≠ "live"
+## 3. Important nuance: "pushed to GitHub" ≠ "live" (now resolved)
 
-Pushing code to GitHub does **not** by itself make Sonika live. Two things stand between the current state and a working production site:
+Pushing code to GitHub does **not** by itself make Sonika live — two things had to be
+set up in the cloud, and both are now done:
 
-1. **A Vercel project must be connected to the GitHub repo** for a push to trigger a deploy. _(This connection is not yet confirmed — see Step 1 below.)_
-2. **Production environment variables and the database must be set up in the cloud.** The code ships with local-development defaults that point at a localhost database, which won't work in production until overridden.
+1. ✅ **Vercel connected to the repo** — pushes to `main` auto-deploy.
+2. ✅ **Production env + database set up** — prod Supabase project, migrations applied, and the 4 required env vars set in Vercel (site URL + Supabase URL/anon/service-role keys).
+
+**Gotchas hit and solved along the way (worth remembering):**
+- The prod Supabase project uses Supabase's **new API-key system** (`sb_publishable_…` / `sb_secret_…`). The app expects the **legacy `anon` / `service_role` JWT keys** (start with `eyJ…`), found under the **"Legacy anon, service…"** tab in Settings → API Keys. Using the wrong family throws "Invalid API key."
+- Supabase **email confirmation was turned off** so signup lands straight in the dashboard. If it's ever re-enabled, the signup form needs a "check your inbox" state added first.
+- Vercel env-var changes **only take effect after a redeploy.**
 
 ---
 
@@ -74,32 +96,35 @@ Pushing code to GitHub does **not** by itself make Sonika live. Two things stand
 Work through these in order. Items marked **[required]** are needed for a functional
 live site; **[when ready]** items you can defer until you actually want paid features on.
 
-### Step 1 — Connect Vercel to the repo **[required]**
-- Log in to Vercel, import the GitHub repo `leviduncan/sonika` (or confirm it's already linked).
-- Once linked, every push to `main` auto-deploys. Confirm a build ran on commit `149c3ef`.
+### Step 1 — Connect Vercel to the repo ✅ **[DONE]**
+- Vercel is connected to `leviduncan/sonika`; pushes to `main` auto-deploy. Live at trysonika.com.
 
-### Step 2 — Create the production Supabase project **[required]**
-- Create a new Supabase project (separate from local dev).
-- Run the 3 database migrations against it (the SQL files under `supabase/migrations/`), via `supabase db push` or by pasting them into the Supabase SQL editor **in filename order**:
+### Step 2 — Create the production Supabase project ✅ **[DONE]**
+- Prod project `sonika-os-db` created; all 3 migrations applied (5 tables present):
   1. `20260625120000_init.sql` (schema + RLS + signup trigger)
   2. `20260627120000_add_seat_vapi_phone_number_id.sql`
   3. `20260627150000_agency_billing.sql`
-- From the Supabase project settings, copy the **Project URL**, the **anon key**, and the **service-role key**.
+- Used the **legacy `anon` + `service_role` JWT keys** (Settings → API Keys → "Legacy anon, service…" tab), not the new `sb_*` keys.
 
-### Step 3 — Set production environment variables in Vercel **[required]**
-In the Vercel project → Settings → Environment Variables, add:
+### Step 3 — Set production environment variables in Vercel ✅ **[DONE]**
+These 4 are set and verified working:
 
-| Variable | Value | Notes |
-|---|---|---|
-| `NEXT_PUBLIC_SITE_URL` | your production URL (e.g. `https://sonika.app`) | used for auth redirects + metadata |
-| `NEXT_PUBLIC_SUPABASE_URL` | prod Supabase project URL | from Step 2 |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | prod anon key | browser-safe, RLS-enforced |
-| `SUPABASE_SERVICE_ROLE_KEY` | prod service-role key | **secret** — server only, never `NEXT_PUBLIC_` |
+| Variable | Notes |
+|---|---|
+| `NEXT_PUBLIC_SITE_URL` | `https://trysonika.com` — auth redirects + metadata |
+| `NEXT_PUBLIC_SUPABASE_URL` | prod Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | legacy anon JWT (`eyJ…`), browser-safe, RLS-enforced |
+| `SUPABASE_SERVICE_ROLE_KEY` | legacy service_role JWT (`eyJ…`), **secret** — server only |
 
-Redeploy after adding these. **At this point you have a working live app** — agencies can sign up, log in, and use the dashboard. Provisioning and billing run in "mock" mode (no real phone numbers, no charges) until you add the keys below.
+Also done in Supabase: **email confirmation turned off**, and **Site URL** set to the prod URL.
 
-### Step 4 — Open the front door **[required, when you want signups]**
-- Set `NEXT_PUBLIC_SIGNUP_OPEN=1` in Vercel to surface Sign up / Log in links on the landing page. (Leave it off to keep the site a parked teaser while you test.)
+### Step 4 — Open the front door ⬜ **[NEXT — required when you want public signups]**
+- Currently **parked**: the landing page shows no signup/login links; you reach `/signup` by direct URL.
+- Set `NEXT_PUBLIC_SIGNUP_OPEN=1` in Vercel + redeploy to surface Sign up / Log in links publicly.
+- Recommendation: keep it parked while lining up your first agency conversations; flip it when ready to accept self-serve signups.
+
+### Step 4.5 — (Optional, free) Test the full app flow in mock mode
+- From the dashboard, **+ Add Client** → provision it. With no Vapi/Twilio/Stripe keys set, the whole chain runs in mock mode: generates a prompt, "creates" an assistant, "assigns" a number, flips the client **live** — with fake IDs, **spending nothing.** Validates the provisioning UX end-to-end before real keys.
 
 ### Step 5 — Turn on real provisioning **[when ready — this spends money]**
 Add these to Vercel to make provisioning create real agents and buy real numbers:
@@ -134,15 +159,16 @@ Add these to Vercel to make provisioning create real agents and buy real numbers
 
 ## 5. Recommended go-live sequence
 
-1. **Soft launch (free):** Steps 1–4. Live app, real signups, provisioning + billing in mock mode. Nothing costs money. Good for demos and first agency conversations.
-2. **Enable provisioning:** Step 5 in a controlled way — provision one test client, confirm a real call flows into the call log.
-3. **Enable billing:** Step 6 in Stripe **test mode** first, run a full checkout, then switch to live keys.
-4. **Flip fully live:** real Stripe keys, signup open, 10DLC registered.
+1. ✅ **Soft launch (free) — DONE.** Live app on trysonika.com, signup working, provisioning + billing in mock mode. Nothing costs money.
+2. **← YOU ARE HERE.** Optionally test the provisioning UX in mock mode (Step 4.5), and decide when to open public signups (Step 4). Line up first agency conversations.
+3. **Enable provisioning:** Step 5, in a controlled way — provision one test client, confirm a real call flows into the call log. *(First step that spends money.)*
+4. **Enable billing:** Step 6 in Stripe **test mode** first, run a full checkout, then switch to live keys.
+5. **Flip fully live:** real Stripe keys, signup open, 10DLC registered.
 
 ---
 
 ## 6. Open questions / things to confirm
-- Is the Vercel ↔ GitHub integration already set up, or does it need creating?
-- What's the production domain?
-- Do you have accounts + keys ready for Supabase (prod), Vapi, Twilio, Stripe, Resend?
-- Is SMS in scope for launch? (If so, start Twilio 10DLC registration now due to lead time.)
+- **When to open public signups?** (Flip `NEXT_PUBLIC_SIGNUP_OPEN=1` — currently parked.)
+- Do you have accounts + keys ready for **Vapi, Twilio, Stripe, Resend** for the paid steps?
+- **Is SMS in scope for launch?** If so, start Twilio **A2P 10DLC** registration now — it has a lead time.
+- Custom **email confirmation** flow: keep it off (current) or re-enable with a "check your inbox" screen added?
