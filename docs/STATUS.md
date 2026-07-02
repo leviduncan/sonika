@@ -149,6 +149,8 @@ Add these to Vercel to make provisioning create real agents and buy real numbers
 - Point a Stripe webhook at `https://your-domain/api/webhooks/stripe`.
 - With billing on, agencies must subscribe before they can provision agents. To keep billing wired but drop the paywall during testing, set `BILLING_MOCK=1`.
 
+> **Where the price is set:** the amount charged is **not in the code** — it lives on the Stripe **Price** object referenced by `STRIPE_PRICE_ID`. The app multiplies that recurring per-seat price by the live-seat count. Stripe price amounts are **immutable**: to change the price, create a *new* Price in the Stripe dashboard, then update `STRIPE_PRICE_ID` in `.env.local` (restart dev) and Vercel (redeploy). Archive the old price so it isn't reused.
+
 ### Step 7 — Email **[when ready]**
 - Add `RESEND_API_KEY` for transactional email.
 
