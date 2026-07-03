@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { requireProfile } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
+import { AutoRefresh } from "@/components/dashboard/AutoRefresh";
 
 export const metadata: Metadata = { title: "Client · Sonika" };
 
@@ -79,6 +80,8 @@ export default async function ClientCallsPage({
 
   return (
     <div>
+      {/* Live agent → poll so incoming calls appear in the log without a reload. */}
+      {seat?.status === "live" && <AutoRefresh />}
       <Link
         href="/dashboard"
         className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:text-accent"
