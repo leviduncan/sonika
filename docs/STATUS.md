@@ -1,19 +1,22 @@
 # Sonika — Project Status & Go-Live Guide
 
-_Last updated: 2026-07-01_
+_Last updated: 2026-07-03_
 
 This is a standalone status snapshot written to be readable without repo access
 (safe to paste into Claude Chat). It covers what Sonika is, what's built and
 verified, what remains, and the exact steps to take it live.
 
-> ## 🟢 STATUS: SOFT-LAUNCHED & LIVE
-> Sonika is deployed and working in production at **https://trysonika.com**.
-> A real agency account has signed up, been auto-provisioned an agency +
-> owner profile, and reached the dashboard — proving the full multi-tenant
-> backend works live. **Steps 1–3 of the go-live checklist are done.**
-> The app currently runs with **provisioning and billing in mock mode**
-> (nothing spends money), and the public landing page is still **parked**
-> (signups by direct URL only) until the front door is opened (Step 4).
+> ## 🟢 STATUS: LIVE — REAL VOICE AGENTS WORKING END-TO-END
+> Sonika is deployed at **https://trysonika.com** and the **full product loop
+> works in production with real money/services**: an agency signs up → adds a
+> client → Sonika generates the prompt (Claude), creates the voice agent
+> (Vapi, "Clara" voice), buys a real phone number (Twilio), and goes live.
+> A real client ("Bayside Plumbing", `+1 478 412 4023`) has taken **real
+> inbound calls**, each auto-logged with an AI **summary, transcript, and
+> recording**. **Steps 1–5 of the go-live checklist are done.**
+> Remaining: verify/finish **Stripe billing** (Step 6), decide when to **open
+> public signups** (Step 4), and **A2P 10DLC** if/when SMS is added (Step 8).
+> The public landing page is still **parked** (signup by direct URL only) by choice.
 
 ---
 
@@ -50,11 +53,15 @@ Supabase project (`sonika-os-db`). Before this work, only the marketing landing
 page was in the repo; the entire app (~3,600 lines) was sitting uncommitted on the
 local machine. It's now version-controlled, reviewed, and running live.
 
-### Proven working in production (verified 2026-07-01)
+### Proven working in production (verified 2026-07-03)
 - ✅ **Vercel deploy** connected to the GitHub repo; pushes to `main` auto-deploy.
 - ✅ **Landing page** renders at trysonika.com (currently in parked/teaser mode by design).
 - ✅ **Prod Supabase** connected with valid keys; the 3 migrations are applied (all 5 tables exist).
-- ✅ **Signup works end-to-end** — a real account ("Levi Marketing") signed up, the DB trigger auto-created the agency + owner profile, the auth session held, and the dashboard rendered its (empty) RLS-scoped client list.
+- ✅ **Signup works end-to-end** — a real account ("Levi Marketing") signed up, the DB trigger auto-created the agency + owner profile, the auth session held, and the dashboard rendered its RLS-scoped client list.
+- ✅ **Real provisioning works end-to-end** — added a client ("Bayside Plumbing"), and Sonika generated the prompt (Claude), created the Vapi assistant with the **Clara** voice, **bought a real Twilio number** (`+1 478 412 4023`), and imported it into Vapi. Seat went **live**.
+- ✅ **Real inbound calls log correctly** — live callers reached the agent; each call auto-appeared in the dashboard with an AI **summary**, **transcript**, caller number, duration, ended-reason, and **recording** link.
+- ✅ **Live call auto-refresh** — the client call-log page polls while the agent is live, so calls appear without a manual reload (great for demos).
+- ✅ **Provisioning errors surface in the UI** — a failed provision now shows the underlying Vapi/Twilio/Claude error on the dashboard, not a generic message.
 
 ### What's built and in the repo
 - **Multi-tenant database schema** — agencies, profiles, sub-accounts (end-clients), seats (one provisioned voice agent = the billing unit), call logs. Tenant isolation enforced by Postgres Row-Level Security keyed on `agency_id`.
@@ -85,9 +92,14 @@ set up in the cloud, and both are now done:
 2. ✅ **Production env + database set up** — prod Supabase project, migrations applied, and the 4 required env vars set in Vercel (site URL + Supabase URL/anon/service-role keys).
 
 **Gotchas hit and solved along the way (worth remembering):**
-- The prod Supabase project uses Supabase's **new API-key system** (`sb_publishable_…` / `sb_secret_…`). The app expects the **legacy `anon` / `service_role` JWT keys** (start with `eyJ…`), found under the **"Legacy anon, service…"** tab in Settings → API Keys. Using the wrong family throws "Invalid API key."
-- Supabase **email confirmation was turned off** so signup lands straight in the dashboard. If it's ever re-enabled, the signup form needs a "check your inbox" state added first.
+- **Vercel env vars, not `.env.local`.** Production reads env vars from the Vercel dashboard; `.env.local` only affects local dev. Keys pasted into `.env.local` do nothing in prod.
 - Vercel env-var changes **only take effect after a redeploy.**
+- The prod Supabase project uses Supabase's **new API-key system** (`sb_publishable_…` / `sb_secret_…`). The app expects the **legacy `anon` / `service_role` JWT keys** (start with `eyJ…`), under the **"Legacy anon, service…"** tab in Settings → API Keys. Wrong family → "Invalid API key."
+- Supabase **email confirmation was turned off** so signup lands straight in the dashboard. If re-enabled, the signup form needs a "check your inbox" state added first.
+- **`PROVISIONING_MOCK=1` overrides everything.** It was left set in Vercel and forced mock provisioning (fake `+1555…` numbers) even with real keys present. Removed it to get real provisioning.
+- **Twilio requires KYC before buying numbers.** Purchases failed with `20003 "Primary compliance profile is not approved"` until the **Trust Hub → Primary Customer Profile** (Individual) was completed and **Approved**.
+- **Vapi's `/phone-number/import` uses the Twilio Auth Token, not a scoped API key.** Sending `twilioApiKeySid/Secret` is rejected ("property should not exist"). The scoped `SK…` key is still used for the direct Twilio *purchase*; only the Vapi import needs `TWILIO_AUTH_TOKEN`.
+- **Stripe prices are immutable and mode-scoped** — see Step 6.
 
 ---
 
@@ -126,51 +138,78 @@ Also done in Supabase: **email confirmation turned off**, and **Site URL** set t
 ### Step 4.5 — (Optional, free) Test the full app flow in mock mode
 - From the dashboard, **+ Add Client** → provision it. With no Vapi/Twilio/Stripe keys set, the whole chain runs in mock mode: generates a prompt, "creates" an assistant, "assigns" a number, flips the client **live** — with fake IDs, **spending nothing.** Validates the provisioning UX end-to-end before real keys.
 
-### Step 5 — Turn on real provisioning **[when ready — this spends money]**
-Add these to Vercel to make provisioning create real agents and buy real numbers:
+### Step 5 — Turn on real provisioning ✅ **[DONE — spends money]**
+These are set in Vercel and real provisioning is verified working:
 
 | Variable | Purpose |
 |---|---|
 | `ANTHROPIC_API_KEY` | Claude — generates each agent's system prompt |
-| `VAPI_API_KEY` | Vapi — creates the voice assistant |
-| `VAPI_WEBHOOK_URL` | **Your production HTTPS URL** + `/api/webhooks/vapi` — assistants provisioned with a wrong/localhost URL will log calls nowhere |
+| `VAPI_API_KEY` | Vapi — creates the voice assistant (use the **Private** key, not Public) |
+| `VAPI_WEBHOOK_URL` | `https://trysonika.com/api/webhooks/vapi` — where end-of-call reports post |
 | `VAPI_WEBHOOK_SECRET` | shared secret to authenticate incoming Vapi webhooks |
-| `TWILIO_ACCOUNT_SID` + `TWILIO_API_KEY_SID` + `TWILIO_API_KEY_SECRET` | Twilio — buys and manages phone numbers |
+| `TWILIO_ACCOUNT_SID` + `TWILIO_API_KEY_SID` + `TWILIO_API_KEY_SECRET` | Twilio — buys the number |
+| `TWILIO_AUTH_TOKEN` | **required** — Vapi's number import authenticates with this, not the API key |
 
-> ⚠️ Once these are set, provisioning a client **purchases a real Twilio number and creates a real Vapi assistant, which cost money.** Keep them unset (or set `PROVISIONING_MOCK=1`) until you're ready.
+Prerequisites that had to be true (and now are):
+- `PROVISIONING_MOCK` **must not be set** (it forces mock).
+- Twilio **Trust Hub Primary Customer Profile = Approved** (KYC), or number purchase fails with `20003`.
+- Twilio account funded (each number ~$1.15 + small monthly + ~$0.05–0.10/min Vapi).
+- Voice default is **Vapi "Clara" (V2)**; override via `VAPI_VOICE_ID` (e.g. `Elliot`), `VAPI_VOICE_PROVIDER`, `VAPI_VOICE_VERSION`.
 
-### Step 6 — Turn on billing **[when ready]**
+> ⚠️ Provisioning a client now **buys a real Twilio number and creates a real Vapi assistant** — real cost. Deleting a client releases the number and deletes the assistant (recurring charges stop; the one-time number fee is sunk). See §7 for who-pays-what.
+
+### Step 6 — Turn on billing ⬜ **[IN PROGRESS — not yet verified]**
+Stripe keys **are set** in Vercel (`STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET`), but **checkout is not yet confirmed working**. Currently **`BILLING_MOCK=1`** is set, which drops the "subscribe before provisioning" paywall — so provisioning is ungated for now (fine for the demo).
+
 | Variable | Purpose |
 |---|---|
 | `STRIPE_SECRET_KEY` | use `sk_test_…` first to test free, then live key |
 | `STRIPE_PRICE_ID` | your recurring per-seat price |
 | `STRIPE_WEBHOOK_SECRET` | from the Stripe dashboard webhook config |
 
-- Point a Stripe webhook at `https://your-domain/api/webhooks/stripe`.
-- With billing on, agencies must subscribe before they can provision agents. To keep billing wired but drop the paywall during testing, set `BILLING_MOCK=1`.
+To finish billing:
+- Point a Stripe webhook at `https://trysonika.com/api/webhooks/stripe`.
+- Ensure `STRIPE_PRICE_ID` is a **recurring** price in the **same mode** (test vs live) as `STRIPE_SECRET_KEY`. A mode mismatch or a one-time price throws on checkout.
+- Run a full **test-mode** checkout end-to-end; then remove `BILLING_MOCK` to re-enable the paywall.
 
 > **Where the price is set:** the amount charged is **not in the code** — it lives on the Stripe **Price** object referenced by `STRIPE_PRICE_ID`. The app multiplies that recurring per-seat price by the live-seat count. Stripe price amounts are **immutable**: to change the price, create a *new* Price in the Stripe dashboard, then update `STRIPE_PRICE_ID` in `.env.local` (restart dev) and Vercel (redeploy). Archive the old price so it isn't reused.
 
 ### Step 7 — Email **[when ready]**
 - Add `RESEND_API_KEY` for transactional email.
 
-### Step 8 — Compliance before real calls **[required before real phone traffic]**
-- Twilio **A2P 10DLC registration** is required for SMS and to avoid carrier filtering on US numbers. This has a lead time — start it early if SMS is in scope.
+### Step 8 — Compliance
+- ✅ **Twilio Trust Hub (Primary Customer Profile, Individual) = Approved** — this was required to buy numbers at all, and is done.
+- ⬜ **A2P 10DLC registration** is still required **only if you add SMS** (it has lead time). Inbound **voice** does not need it, so it's not blocking the current voice product. Start it when SMS enters scope — and note it prefers a registered business/EIN, so revisit once the LLC exists.
 
 ---
 
 ## 5. Recommended go-live sequence
 
-1. ✅ **Soft launch (free) — DONE.** Live app on trysonika.com, signup working, provisioning + billing in mock mode. Nothing costs money.
-2. **← YOU ARE HERE.** Optionally test the provisioning UX in mock mode (Step 4.5), and decide when to open public signups (Step 4). Line up first agency conversations.
-3. **Enable provisioning:** Step 5, in a controlled way — provision one test client, confirm a real call flows into the call log. *(First step that spends money.)*
-4. **Enable billing:** Step 6 in Stripe **test mode** first, run a full checkout, then switch to live keys.
-5. **Flip fully live:** real Stripe keys, signup open, 10DLC registered.
+1. ✅ **Soft launch (free) — DONE.** Live app on trysonika.com, signup working.
+2. ✅ **Real provisioning — DONE.** Real agent + number + inbound call logging verified (Bayside Plumbing).
+3. **← YOU ARE HERE: record the demo video.** A real, callable agent ("Clara") with a live CRM/call-log is ready to film. See `docs/demo-video-script.md` if created.
+4. **Finish billing:** Step 6 — confirm a Stripe **test-mode** checkout end-to-end, then remove `BILLING_MOCK` to re-enable the paywall; later switch to live keys.
+5. **Open the doors:** flip `NEXT_PUBLIC_SIGNUP_OPEN=1` when ready for public signups; add 10DLC only if/when SMS enters scope.
 
 ---
 
 ## 6. Open questions / things to confirm
 - **When to open public signups?** (Flip `NEXT_PUBLIC_SIGNUP_OPEN=1` — currently parked.)
-- Do you have accounts + keys ready for **Vapi, Twilio, Stripe, Resend** for the paid steps?
-- **Is SMS in scope for launch?** If so, start Twilio **A2P 10DLC** registration now — it has a lead time.
+- **Finish Stripe billing** — verify a test-mode checkout, confirm `STRIPE_PRICE_ID` is recurring + same-mode as the secret key, then drop `BILLING_MOCK`.
+- **Is SMS in scope?** If so, start Twilio **A2P 10DLC** (needs lead time; prefers a registered business/EIN).
 - Custom **email confirmation** flow: keep it off (current) or re-enable with a "check your inbox" screen added?
+- **Margin/churn policy** (see §7): setup fee per client? hold vs release numbers?
+
+---
+
+## 7. Billing economics — who pays what
+
+Two separate money flows:
+
+**A. Provider costs (Twilio number, Vapi minutes, Claude) → always the operator (you).**
+Provisioning spends on *your* accounts: Twilio number (~$1.15 + small monthly), Vapi (~$0.05–0.10/min), Claude (fractions of a cent). Deleting a client releases the number and deletes the assistant, so recurring charges stop — but the one-time number fee is already sunk.
+
+**B. The agency's card (Stripe per-seat) → prorated, mostly nets out on quick changes.**
+Your paying customer is the **agency**, billed per **live seat**. A seat going live bumps the Stripe quantity up (proration); deleting drops it (proration credit). Because prorations land on the next invoice, a quick add-then-delete roughly nets to ~$0 for the agency — they mainly pay for seats that stay live across a cycle. Quantity floors at **1** (a subscribed agency always pays for ≥1 seat). The paywall (`isBillingEnforced`) blocks provisioning unless the agency has an active/trialing subscription — so non-payers can't burn your provider budget. *(Currently bypassed by `BILLING_MOCK=1`.)*
+
+**Margin risk:** churn — agencies spinning agents up/down burn your Twilio number fees without matching revenue. Mitigations to consider: a per-client **setup/activation fee**, **holding/reusing numbers** instead of releasing immediately, or a **minimum commitment**.
