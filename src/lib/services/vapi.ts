@@ -17,8 +17,12 @@ const VAPI_BASE = "https://api.vapi.ai";
 
 const MODEL_PROVIDER = process.env.VAPI_MODEL_PROVIDER ?? "openai";
 const MODEL = process.env.VAPI_MODEL ?? "gpt-4o";
-const VOICE_PROVIDER = process.env.VAPI_VOICE_PROVIDER ?? "11labs";
-const VOICE_ID = process.env.VAPI_VOICE_ID ?? "N2lVS1w4EtoT3dr4eOWO";
+// Default to Vapi's native "Clara" voice (warm, professional, American) — nicer
+// and cheaper than 11labs for a receptionist. Vapi voices support a higher-
+// quality V2 model; on by default here, ignored by other providers. All overridable.
+const VOICE_PROVIDER = process.env.VAPI_VOICE_PROVIDER ?? "vapi";
+const VOICE_ID = process.env.VAPI_VOICE_ID ?? "Clara";
+const VOICE_VERSION = process.env.VAPI_VOICE_VERSION ?? "2";
 
 type CreateAssistantInput = { name: string; systemPrompt: string };
 type CreateAssistantResult = { assistantId: string };
@@ -66,7 +70,11 @@ export async function createAssistant({
         messages: [{ role: "system", content: systemPrompt }],
         temperature: 0.7,
       },
-      voice: { provider: VOICE_PROVIDER, voiceId: VOICE_ID },
+      voice: {
+        provider: VOICE_PROVIDER,
+        voiceId: VOICE_ID,
+        ...(VOICE_PROVIDER === "vapi" ? { version: Number(VOICE_VERSION) } : {}),
+      },
       transcriber: { provider: "deepgram", model: "nova-2", language: "en" },
       ...(server ? { server } : {}),
     }),
