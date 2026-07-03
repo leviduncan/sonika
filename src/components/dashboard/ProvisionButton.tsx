@@ -62,7 +62,7 @@ export default function ProvisionButton({
         </button>
       </form>
       {state?.error && (
-        <span className="max-w-[16rem] text-right font-mono text-[10px] text-red-400">
+        <span className="max-w-sm text-right font-mono text-[10px] leading-relaxed text-red-400">
           {state.error}
         </span>
       )}

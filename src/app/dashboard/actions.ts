@@ -212,7 +212,10 @@ export async function provisionClient(
     // Leave a failed seat so the UI can offer a retry (architecture.md §5).
     await admin.from("seats").update({ status: "failed" }).eq("id", seatId);
     await admin.from("sub_accounts").update({ status: "draft" }).eq("id", subAccountId);
-    return { error: "Provisioning failed. You can retry." };
+    // Surface the underlying provider error so setup issues (bad key, no Twilio
+    // balance, unavailable number, Vapi config) are diagnosable from the UI.
+    const detail = (err instanceof Error ? err.message : String(err)).slice(0, 200);
+    return { error: `Provisioning failed: ${detail}` };
   }
 }
 
