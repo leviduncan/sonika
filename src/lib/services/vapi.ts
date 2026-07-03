@@ -88,21 +88,16 @@ export async function registerTwilioNumber({
   }
 
   // Field names confirmed against the live API: /phone-number/import expects
-  // `twilioPhoneNumber` (E.164) and rejects `provider`/`number` (the docs are
-  // stale on this). Auth prefers a scoped API Key (SK…) + secret; falls back to
-  // the master Auth Token when no key is configured — Vapi accepts either.
-  const useKey = Boolean(process.env.TWILIO_API_KEY_SID && process.env.TWILIO_API_KEY_SECRET);
+  // `twilioPhoneNumber` (E.164). Auth MUST be the account's master Auth Token —
+  // Vapi rejects scoped API Key SID/secret here ("property twilioApiKeySid
+  // should not exist"). The scoped key is still used for the direct Twilio
+  // number *purchase*; only this Vapi import step requires the Auth Token.
   const data = (await vapiFetch("/phone-number/import", {
     method: "POST",
     body: JSON.stringify({
       twilioPhoneNumber: number,
       twilioAccountSid: process.env.TWILIO_ACCOUNT_SID,
-      ...(useKey
-        ? {
-            twilioApiKeySid: process.env.TWILIO_API_KEY_SID,
-            twilioApiKeySecret: process.env.TWILIO_API_KEY_SECRET,
-          }
-        : { twilioAuthToken: process.env.TWILIO_AUTH_TOKEN }),
+      twilioAuthToken: process.env.TWILIO_AUTH_TOKEN,
       assistantId,
     }),
   })) as { id: string };
