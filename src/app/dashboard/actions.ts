@@ -13,6 +13,7 @@ import {
   deletePhoneNumber,
 } from "@/lib/services/vapi";
 import { purchaseNumber, releaseNumber } from "@/lib/services/twilio";
+import { scrapeWebsite } from "@/lib/services/scrape";
 import { isBillingEnabled, isBillingEnforced, isAgencyBilled, setSeatQuantity } from "@/lib/services/stripe";
 import type { AgencyProfile } from "@/lib/dal";
 
@@ -39,6 +40,9 @@ async function syncSeatBilling(profile: AgencyProfile): Promise<void> {
 const CreateSchema = z.object({
   name: z.string().trim().min(2, "Client name must be at least 2 characters."),
   websiteUrl: z.string().trim().optional(),
+  // Optional free-text context about the client. Bounded so it can't bloat the
+  // Claude call (or the row); a few sentences is the intended use.
+  brief: z.string().trim().max(2000, "Keep the client brief under 2000 characters.").optional(),
 });
 
 /**
@@ -70,6 +74,7 @@ export async function createSubAccount(
   const parsed = CreateSchema.safeParse({
     name: formData.get("name"),
     websiteUrl: formData.get("websiteUrl"),
+    brief: formData.get("brief"),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid details." };
@@ -87,6 +92,7 @@ export async function createSubAccount(
     agency_id: profile.agency_id,
     name: parsed.data.name,
     website_url: website,
+    brief: parsed.data.brief || null,
     status: "draft",
   });
   if (error) return { error: error.message };
@@ -118,7 +124,7 @@ export async function provisionClient(
   const supabase = await createClient();
   const { data: sub } = await supabase
     .from("sub_accounts")
-    .select("id, name, website_url")
+    .select("id, name, website_url, brief")
     .eq("id", subAccountId)
     .single();
 
@@ -176,9 +182,15 @@ export async function provisionClient(
   let assistantId: string | undefined;
   let purchasedSid: string | undefined;
   try {
+    // Read the client's website so the prompt reflects their actual business.
+    // Best-effort + time-bounded (see scrapeWebsite): a slow/blocked site
+    // degrades to the name-only prompt rather than failing the provision.
+    const siteContent = await scrapeWebsite(sub.website_url);
     const systemPrompt = await generateSystemPrompt({
       businessName: sub.name,
       websiteUrl: sub.website_url,
+      siteContent,
+      brief: sub.brief,
     });
 
     // 1. Vapi assistant  2. Twilio number  3. point the number at the assistant

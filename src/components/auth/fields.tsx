@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes } from "react";
+import type { InputHTMLAttributes, TextareaHTMLAttributes } from "react";
 
 const inputClass =
   "w-full rounded-xl border border-border bg-background/40 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 transition-colors focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60";
@@ -18,6 +18,27 @@ export function Field({
         {label}
       </label>
       <input id={name} name={name} className={inputClass} {...props} />
+    </div>
+  );
+}
+
+/** Labelled multi-line input — same styling as Field, for longer free text. */
+export function TextareaField({
+  label,
+  name,
+  hint,
+  ...props
+}: { label: string; name: string; hint?: string } & TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label
+        htmlFor={name}
+        className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground"
+      >
+        {label}
+      </label>
+      <textarea id={name} name={name} className={`${inputClass} resize-none`} {...props} />
+      {hint ? <p className="text-xs text-muted-foreground/60">{hint}</p> : null}
     </div>
   );
 }

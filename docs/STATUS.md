@@ -1,6 +1,6 @@
 # Sonika — Project Status & Go-Live Guide
 
-_Last updated: 2026-07-03_
+_Last updated: 2026-07-09_
 
 This is a standalone status snapshot written to be readable without repo access
 (safe to paste into Claude Chat). It covers what Sonika is, what's built and
@@ -67,7 +67,7 @@ local machine. It's now version-controlled, reviewed, and running live.
 - **Multi-tenant database schema** — agencies, profiles, sub-accounts (end-clients), seats (one provisioned voice agent = the billing unit), call logs. Tenant isolation enforced by Postgres Row-Level Security keyed on `agency_id`.
 - **Agency authentication** — signup, login, logout. New signups auto-create an agency + owner profile via a database trigger.
 - **Agency dashboard** — create and manage end-client sub-accounts, view call logs per client.
-- **Provisioning flow** — paste a client website → Claude generates a system prompt → Vapi assistant created → Twilio number purchased and attached → agent goes live. Includes automatic teardown if any step fails (so a crash never leaves a paid phone number or orphaned assistant behind).
+- **Provisioning flow** — add a client (name + website + optional **"About this client" brief**) → **Sonika reads the site** (Jina Reader) → Claude generates a system prompt tailored to that business, treating the agency's brief as authoritative → Vapi assistant created → Twilio number purchased and attached → agent goes live. The website read is best-effort and time-bounded: a slow or blocked site falls back to the brief (or a generic prompt) rather than failing the provision. The brief is what keeps a demo agent specific even when the client's site is thin. Includes automatic teardown if any step fails (so a crash never leaves a paid phone number or orphaned assistant behind).
 - **Stripe per-seat billing** — checkout, customer portal, webhook sync, automatic seat-quantity updates, and a paywall that requires an active subscription before provisioning (with a dev bypass).
 - **Vapi call webhook** — receives end-of-call reports and writes them to call logs, signature-verified.
 - **Signup gate flag** — the public landing page stays a "parked" teaser until you flip one env var at go-live.
@@ -112,10 +112,11 @@ live site; **[when ready]** items you can defer until you actually want paid fea
 - Vercel is connected to `leviduncan/sonika`; pushes to `main` auto-deploy. Live at trysonika.com.
 
 ### Step 2 — Create the production Supabase project ✅ **[DONE]**
-- Prod project `sonika-os-db` created; all 3 migrations applied (5 tables present):
+- Prod project `sonika-os-db` created; migrations applied (5 tables present):
   1. `20260625120000_init.sql` (schema + RLS + signup trigger)
   2. `20260627120000_add_seat_vapi_phone_number_id.sql`
   3. `20260627150000_agency_billing.sql`
+  4. `20260710120000_add_sub_account_brief.sql` — **⚠️ NOT YET APPLIED TO PROD.** Adds the `sub_accounts.brief` column. Until it's applied (`supabase db push`, or run the SQL in the Supabase SQL editor), adding a client on prod will fail because the insert references `brief`. Apply this before the agency demo.
 - Used the **legacy `anon` + `service_role` JWT keys** (Settings → API Keys → "Legacy anon, service…" tab), not the new `sb_*` keys.
 
 ### Step 3 — Set production environment variables in Vercel ✅ **[DONE]**
@@ -144,6 +145,7 @@ These are set in Vercel and real provisioning is verified working:
 | Variable | Purpose |
 |---|---|
 | `ANTHROPIC_API_KEY` | Claude — generates each agent's system prompt |
+| `JINA_API_KEY` | *(optional)* Website reader for prompt tailoring. Keyless by default — set only for higher rate limits. `SCRAPE_TIMEOUT_MS` / `SCRAPE_MAX_CHARS` also optional. |
 | `VAPI_API_KEY` | Vapi — creates the voice assistant (use the **Private** key, not Public) |
 | `VAPI_WEBHOOK_URL` | `https://trysonika.com/api/webhooks/vapi` — where end-of-call reports post |
 | `VAPI_WEBHOOK_SECRET` | shared secret to authenticate incoming Vapi webhooks |
@@ -194,6 +196,7 @@ To finish billing:
 ---
 
 ## 6. Open questions / things to confirm
+- **Apply the `brief` migration to prod, then verify the tailoring live** — the website-read scrape (Jina Reader) and the optional **"About this client" brief** were added 2026-07-09/10, *after* the 2026-07-03 end-to-end verification, so they haven't been exercised in production. **First apply migration #4 to prod** (see Step 2) — adding a client will fail without it. Then provision a client with a brief + content-rich site and confirm the generated prompt reflects the brief's facts/rules (and that a blocked/slow site still yields a specific agent from the brief alone). It all runs in the same synchronous request; the page's `maxDuration` was raised to 60s to give the longer chain headroom. Local scrape + prompt-branching are already verified; the untested path is a real provision with live Claude/Vapi/Twilio keys.
 - **When to open public signups?** (Flip `NEXT_PUBLIC_SIGNUP_OPEN=1` — currently parked.)
 - **Finish Stripe billing** — verify a test-mode checkout, confirm `STRIPE_PRICE_ID` is recurring + same-mode as the secret key, then drop `BILLING_MOCK`.
 - **Is SMS in scope?** If so, start Twilio **A2P 10DLC** (needs lead time; prefers a registered business/EIN).

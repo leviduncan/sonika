@@ -9,6 +9,12 @@ import ProvisionButton from "@/components/dashboard/ProvisionButton";
 
 export const metadata: Metadata = { title: "Dashboard · Sonika" };
 
+// Provisioning (provisionClient) runs synchronously from this page: scrape →
+// Claude → Vapi → Twilio → Vapi. Raise the Server Action timeout above the
+// platform default so a slow site scrape + prompt generation never trips it.
+// The scrape itself is separately bounded (SCRAPE_TIMEOUT_MS).
+export const maxDuration = 60;
+
 type Seat = {
   id: string;
   status: "pending" | "provisioning" | "live" | "failed" | "suspended";
