@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { createSubAccount, type SubAccountState } from "@/app/dashboard/actions";
-import { Field, FormError, SubmitButton } from "@/components/auth/fields";
+import { Field, TextareaField, FormError, SubmitButton } from "@/components/auth/fields";
 
 export default function AddClientDialog() {
   const [open, setOpen] = useState(false);
@@ -80,6 +80,14 @@ export default function AddClientDialog() {
                 placeholder="baysidedental.com"
                 autoComplete="off"
                 inputMode="url"
+              />
+              <TextareaField
+                label="About this client"
+                name="brief"
+                rows={4}
+                placeholder="Cosmetic + family dentist, open Mon–Fri 8–5. Always offer to book a consult; never quote prices — take a message instead."
+                autoComplete="off"
+                hint="Optional. Services, hours, how the agent should handle calls. We use this and their website to tailor the agent."
               />
               <FormError message={state?.error} />
               <SubmitButton pending={pending} label="Create client" />
