@@ -7,7 +7,7 @@ import { AutoRefresh } from "@/components/dashboard/AutoRefresh";
 
 export const metadata: Metadata = { title: "Client · Sonika" };
 
-type Seat = { status: string; twilio_number: string | null };
+type Seat = { status: string; twilio_number: string | null; system_prompt: string | null };
 type SubAccount = {
   id: string;
   name: string;
@@ -59,7 +59,7 @@ export default async function ClientCallsPage({
   // RLS scopes both reads to the caller's agency.
   const { data: sub } = await supabase
     .from("sub_accounts")
-    .select("id, name, website_url, status, seats(status, twilio_number)")
+    .select("id, name, website_url, status, seats(status, twilio_number, system_prompt)")
     .eq("id", id)
     .maybeSingle();
 
@@ -107,6 +107,25 @@ export default async function ClientCallsPage({
           </span>
         )}
       </div>
+
+      {/* What the agent was built to say. Collapsed to keep the page about the
+          call log; opening it shows how the site + brief became this agent. */}
+      {seat?.system_prompt && (
+        <section className="mt-10">
+          <details className="rounded-2xl border border-border bg-muted/20 p-5">
+            <summary className="cursor-pointer font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground transition-colors hover:text-accent">
+              Agent instructions
+            </summary>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground/70">
+              Generated from {client.website_url ?? "this client's details"} when the agent was
+              provisioned. This is what the agent follows on every call.
+            </p>
+            <pre className="mt-3 max-h-80 overflow-y-auto whitespace-pre-wrap font-mono text-xs leading-relaxed text-muted-foreground/80">
+              {seat.system_prompt}
+            </pre>
+          </details>
+        </section>
+      )}
 
       <section className="mt-10">
         <div className="flex items-center justify-between">
