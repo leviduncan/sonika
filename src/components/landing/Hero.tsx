@@ -30,21 +30,28 @@ export default function Hero() {
         </span>
       </div>
 
-      <h1 className="font-display text-[clamp(3rem,9vw,7.5rem)] font-medium leading-[0.95] tracking-[-0.04em]">
-        sonika
-      </h1>
-
-      <div className="mt-8 flex items-center gap-4">
+      <div className="flex items-center gap-5">
+        <span className="font-display text-[clamp(2rem,5vw,3.25rem)] font-medium leading-none tracking-[-0.04em]">
+          sonika
+        </span>
         <Waveform />
-        <span className="font-mono text-xs uppercase tracking-[0.25em] text-accent text-glow">
+        <span className="hidden font-mono text-xs uppercase tracking-[0.25em] text-accent text-glow sm:inline">
           live signal
         </span>
       </div>
 
-      <p className="mt-10 max-w-2xl text-balance text-lg leading-relaxed text-muted-foreground md:text-xl">
-        <span className="text-foreground">Voice infrastructure</span> for marketing agencies —
-        purpose-built APIs, agents and pipelines that let your team ship voice products without the
-        plumbing.
+      <h1 className="mt-10 max-w-4xl text-balance font-display text-[clamp(2.5rem,7vw,5rem)] font-medium leading-[1.02] tracking-[-0.035em]">
+        Launch AI voice agents for every client in{" "}
+        <span className="text-accent text-glow">under 10 minutes</span>.
+      </h1>
+
+      <p className="mt-7 max-w-2xl text-balance text-lg leading-relaxed text-muted-foreground md:text-xl">
+        <span className="text-foreground">White-label Voice AI</span> built specifically for
+        agencies.
+      </p>
+
+      <p className="mt-6 max-w-2xl font-mono text-[11px] uppercase leading-relaxed tracking-[0.2em] text-muted-foreground">
+        GoHighLevel · Local SEO · Web Design · Lead Gen agencies
       </p>
 
       <div className="mt-12 flex flex-col items-center gap-4 sm:flex-row">
@@ -67,19 +74,19 @@ export default function Hero() {
         ) : (
           <>
             <a
-              href="https://x.com/trysonika"
-              target="_blank"
-              rel="noreferrer"
+              href="#early-access"
               className="glow-accent group inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 font-mono text-sm uppercase tracking-[0.15em] text-accent-foreground transition-transform hover:-translate-y-0.5"
             >
-              Follow the build
+              Get early access
               <span className="transition-transform group-hover:translate-x-0.5">→</span>
             </a>
             <a
-              href="mailto:hello@trysonika.com"
+              href="https://x.com/trysonika"
+              target="_blank"
+              rel="noreferrer"
               className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground transition-colors hover:text-foreground"
             >
-              hello@trysonika.com
+              Follow the build ↗
             </a>
           </>
         )}

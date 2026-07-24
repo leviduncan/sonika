@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "Sonika — Voice infrastructure for marketing agencies";
+export const alt = "Sonika — White-label Voice AI for agencies";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -31,7 +31,7 @@ export default function Image() {
       >
         <div
           style={{
-            fontSize: 220,
+            fontSize: 110,
             fontWeight: 500,
             color: FG,
             letterSpacing: "-0.04em",
@@ -47,8 +47,8 @@ export default function Image() {
             display: "flex",
             alignItems: "center",
             gap: 8,
-            height: 64,
-            marginTop: 32,
+            height: 48,
+            marginTop: 24,
           }}
         >
           {BARS.map((h, i) => (
@@ -67,14 +67,34 @@ export default function Image() {
 
         <div
           style={{
-            marginTop: 40,
-            fontSize: 36,
+            marginTop: 44,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            fontSize: 56,
+            fontWeight: 500,
+            color: FG,
+            letterSpacing: "-0.02em",
+            lineHeight: 1.15,
+          }}
+        >
+          <div style={{ display: "flex" }}>Launch AI voice agents for every</div>
+          <div style={{ display: "flex" }}>
+            client in
+            <span style={{ color: ACCENT, marginLeft: 14 }}>under 10 minutes.</span>
+          </div>
+        </div>
+
+        <div
+          style={{
+            marginTop: 28,
+            fontSize: 30,
             color: MUTED,
             letterSpacing: "-0.01em",
             display: "flex",
           }}
         >
-          Voice infrastructure for marketing agencies
+          White-label Voice AI built specifically for agencies.
         </div>
       </div>
     ),

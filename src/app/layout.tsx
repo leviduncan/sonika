@@ -5,12 +5,12 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://trysonika.com";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "Sonika | Voice infrastructure for marketing agencies",
+  title: "Sonika | White-label Voice AI for agencies",
   description:
-    "Sonika is voice infrastructure built for marketing agencies. Building in public.",
+    "Launch AI voice agents for every client in under 10 minutes. White-label Voice AI built specifically for GoHighLevel, Local SEO, Web Design and Lead Gen agencies.",
   openGraph: {
-    title: "Sonika — Voice infrastructure for agencies",
-    description: "Voice infrastructure for marketing agencies. Building in public.",
+    title: "Sonika — White-label Voice AI for agencies",
+    description: "Launch AI voice agents for every client in under 10 minutes.",
     type: "website",
   },
   twitter: {
