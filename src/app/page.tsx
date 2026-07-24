@@ -32,13 +32,13 @@ const ICP = [
 const WHY = [
   {
     metric: "< 10 min",
-    title: "Client live the same call",
-    line: "Paste their website URL. The agent writes itself, a number gets provisioned, and it answers. No scripting sessions, no telephony tickets.",
+    title: "Close the deal. Launch before you hang up.",
+    line: "Tell us about the client — services, hours, how to handle calls. Sonika builds an agent that actually knows the business, not a generic script.",
   },
   {
-    metric: "Your margin",
+    metric: "~$400/mo",
     title: "You set the price",
-    line: "You pay per seat and bill your client whatever you want. The spread is yours — it never shows up on their invoice.",
+    line: "You pay ~$99 per client seat and charge your own rate — commonly ~$500/mo. That's ~$400 in margin, every month, on every client.",
   },
   {
     metric: "100%",

@@ -50,6 +50,10 @@ export default function Hero() {
         agencies.
       </p>
 
+      <p className="mt-4 max-w-2xl text-balance text-base leading-relaxed text-muted-foreground">
+        No scripting. No dev work. No telephony setup.
+      </p>
+
       <p className="mt-6 max-w-2xl font-mono text-[11px] uppercase leading-relaxed tracking-[0.2em] text-muted-foreground">
         GoHighLevel · Local SEO · Web Design · Lead Gen agencies
       </p>
