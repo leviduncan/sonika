@@ -2,7 +2,9 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 const PROTECTED_PREFIXES = ["/dashboard"];
-const AUTH_ROUTES = ["/login", "/signup"];
+// Signed-in users skip these. /reset-password is deliberately absent: the
+// recovery link signs the user in first, then sends them there.
+const AUTH_ROUTES = ["/login", "/signup", "/forgot-password"];
 
 /**
  * Refreshes the Supabase auth session on every request and applies coarse

@@ -2,6 +2,22 @@
 
 Running log of why we chose what we chose. Newest first.
 
+## 2026-11-26 — Password reset links use `token_hash`, not the PKCE code
+
+**Decision.** The reset email links to `/auth/confirm?token_hash=…&type=recovery`
+(custom Supabase template, `supabase/templates/recovery.html`), which calls
+`verifyOtp` server-side. `/auth/confirm` also accepts the default PKCE `?code=`
+link as a fallback.
+
+**Why.** `@supabase/ssr` uses PKCE, and a PKCE code only exchanges in the
+browser that requested the email (the verifier lives in its cookies). Agency
+owners often request a reset on a laptop and open the email on a phone. The
+`token_hash` link works on any device.
+
+**Also.** The forgot form shows the same "on its way" message whether or not
+the email has an account (no account enumeration). A successful reset signs out
+the user's other sessions.
+
 ## 2026-06-27 — Per-seat Stripe billing & provisioning gate
 
 **Model.** One Stripe customer + one subscription per agency; the subscription's
