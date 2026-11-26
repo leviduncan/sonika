@@ -20,16 +20,22 @@ const TTL_SECONDS = 15 * 60;
  * one from the service-role key (already a server-only secret in every
  * environment) so no new deploy step is needed. Fails closed when neither is set.
  */
+let warnedShortSecret = false;
+
 function signingKey(): Buffer | null {
   const dedicated = process.env.RECOVERY_COOKIE_SECRET;
   if (dedicated && dedicated.length >= 32) return Buffer.from(dedicated);
-  if (dedicated) {
+
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (dedicated && !warnedShortSecret) {
+    warnedShortSecret = true;
     console.warn(
-      "[auth] RECOVERY_COOKIE_SECRET is shorter than 32 characters and is ignored; using the key derived from SUPABASE_SERVICE_ROLE_KEY.",
+      serviceKey
+        ? "[auth] RECOVERY_COOKIE_SECRET is shorter than 32 characters and is ignored; using the key derived from SUPABASE_SERVICE_ROLE_KEY."
+        : "[auth] RECOVERY_COOKIE_SECRET is shorter than 32 characters and is ignored.",
     );
   }
 
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (serviceKey) {
     return createHmac("sha256", serviceKey).update("sonika:recovery-cookie:v1").digest();
   }

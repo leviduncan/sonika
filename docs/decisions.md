@@ -6,17 +6,25 @@ Running log of why we chose what we chose. Newest first.
 
 **The root `proxy.ts` never runs.** The app lives in `src/app`, and Next 16
 only picks up the proxy file at the same level as `app` (so `src/proxy.ts`).
-`next build` lists no Proxy, and `.next/server/middleware-manifest.json` has
-`"middleware": {}`. This predates password reset: the file has been in the
-wrong place since it was added in 149c3ef, and `main` has the same problem.
+`next build` lists no Proxy, and `.next/server/functions-config-manifest.json`
+has no `/_middleware` entry (a working `src/proxy.ts` produces one). Don't use
+`middleware-manifest.json` to check: it stays empty even when the proxy works.
+This predates password reset: the file has been in the wrong place since it
+was added in 149c3ef, and `main` has the same problem.
 
 Consequences today:
 
-- No Supabase session refresh happens on any request.
+- No per-request session refresh. Server Actions still save refreshed auth
+  cookies through `src/lib/supabase/server.ts`, but a refresh that happens while
+  a page renders is thrown away (Server Components can't set cookies).
 - `/dashboard` is protected only by each page's `requireProfile()` and by RLS.
   The proxy's optimistic `/dashboard` redirect never fires.
-- The proxy's "signed-in users skip these" list does nothing, including the
-  `/forgot-password` entry the password-reset branch added.
+- The proxy's "signed-in users skip these" list does nothing.
+
+**`/forgot-password` is not in that list.** The password-reset branch first
+added it, then took it out. A user who opens a reset link is signed in, so once
+the proxy runs, listing `/forgot-password` would bounce them to the dashboard
+when their 15-minute recovery cookie expires, with no way to request a new link.
 
 **Fix (own branch, not part of password reset):** move `proxy.ts` to
 `src/proxy.ts`. Once it runs, the path-filter holes in its matcher become real

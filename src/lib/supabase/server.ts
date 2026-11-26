@@ -26,8 +26,10 @@ export async function createClient() {
             );
           } catch {
             // `setAll` was called from a Server Component, where setting
-            // cookies isn't allowed. Safe to ignore — the proxy refreshes
-            // the session cookie on every request instead.
+            // cookies isn't allowed, so this refresh is discarded. Server
+            // Actions and Route Handlers do persist it. NOTE: the proxy that
+            // should refresh on every request doesn't run yet (root proxy.ts
+            // must move to src/proxy.ts; see docs/decisions.md).
           }
         },
       },
