@@ -3,9 +3,10 @@ import { defineConfig } from "@playwright/test";
 const PORT = 3100;
 
 /**
- * Landing fidelity and behavior checks. The app under test is a production
- * build, because dev mode injects overlays and changes timing. Set
- * PW_REUSE_SERVER=1 to point at a server you already started on port 3100.
+ * End-to-end checks. The app under test is a production build, because dev
+ * mode injects overlays and changes timing. Set PW_REUSE_SERVER=1 to point at
+ * a server you already started on port 3100. One worker: the auth specs share
+ * one local Supabase.
  */
 export default defineConfig({
   testDir: "./tests",
@@ -17,8 +18,6 @@ export default defineConfig({
   use: {
     baseURL: `http://localhost:${PORT}`,
     browserName: "chromium",
-    colorScheme: "light",
-    deviceScaleFactor: 1,
   },
   webServer: {
     command: `npm run build && npx next start -p ${PORT}`,
