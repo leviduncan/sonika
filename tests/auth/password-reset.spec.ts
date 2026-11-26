@@ -10,7 +10,9 @@ import { ALLOWED_NEXT_PATHS, safeNext } from "../../src/lib/auth/redirect";
  * recovery tokens: it creates throwaway users with the Supabase admin API and
  * mints links with `generateLink` (which sends no email). It only runs when
  * .env.local points at a LOCAL Supabase (`supabase start`), never a hosted
- * project, and deletes what it creates.
+ * project, and deletes what it creates. One exception to "no email": the
+ * full-reset test changes a password, so Supabase sends a password-changed
+ * notification, which lands in the local Mailpit inbox only.
  */
 
 loadEnvConfig(process.cwd());

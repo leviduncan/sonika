@@ -4,20 +4,31 @@ Running log of why we chose what we chose. Newest first.
 
 ## 2026-11-26 — Follow-up (not fixed): root `proxy.ts`
 
-The feat/password-reset review flagged an issue in the root `proxy.ts`. It is
-out of scope for the password-reset fix branch and is logged here so it isn't
-lost. What the current file does that needs a decision:
+**The root `proxy.ts` never runs.** The app lives in `src/app`, and Next 16
+only picks up the proxy file at the same level as `app` (so `src/proxy.ts`).
+`next build` lists no Proxy, and `.next/server/middleware-manifest.json` has
+`"middleware": {}`. This predates password reset: the file has been in the
+wrong place since it was added in 149c3ef, and `main` has the same problem.
 
-- The matcher's negative lookahead `(?!api|_next/static|…)` isn't anchored to
-  a path segment, so it skips *any* path that starts with `api` (e.g. `/apiary`),
-  not just `/api/*`.
+Consequences today:
+
+- No Supabase session refresh happens on any request.
+- `/dashboard` is protected only by each page's `requireProfile()` and by RLS.
+  The proxy's optimistic `/dashboard` redirect never fires.
+- The proxy's "signed-in users skip these" list does nothing, including the
+  `/forgot-password` entry the password-reset branch added.
+
+**Fix (own branch, not part of password reset):** move `proxy.ts` to
+`src/proxy.ts`. Once it runs, the path-filter holes in its matcher become real
+and need fixing in the same change:
+
+- The negative lookahead `(?!api|_next/static|…)` isn't anchored to a path
+  segment, so it skips *any* path starting with `api` (e.g. `/apiary`), not
+  just `/api/*`.
 - The extension exclusion `.*\.(?:svg|png|jpg|…)$` applies to every path, so
-  `/dashboard/anything.png` bypasses the proxy's session refresh and the
-  optimistic `/dashboard` gate. Pages still call `requireProfile()` and RLS is
-  the real boundary, so this isn't a data leak, but the gate shouldn't have holes.
-
-Fix on its own branch: anchor the exclusions (`api/`, `_next/static/`, …) and
-limit the extension skip to public assets.
+  `/dashboard/anything.png` would skip the session refresh and the `/dashboard`
+  gate. Anchor the exclusions (`api/`, `_next/static/`, …) and limit the
+  extension skip to public assets.
 
 ## 2026-11-26 — Password reset hardening (review fixes)
 
@@ -51,6 +62,21 @@ server-side only.
 **Prod prerequisite.** With the PKCE fallback gone, production reset links only
 work once `supabase/templates/recovery.html` is pasted into Supabase > Auth >
 Email Templates > Reset Password (the default template sends a `?code=` link).
+The link is built from `{{ .SiteURL }}`, so the production Site URL must be
+`https://trysonika.com`. The app no longer sends a `redirectTo` (it was built
+from the request's Origin header and the template ignored it anyway).
+
+**Required production settings (Supabase > Auth).** The recovery cookie only
+gates the app's own reset form. Supabase's session cookie is readable by the
+page and the anon key is public, so a signed-in session could still call
+Supabase's update-user endpoint directly. Two settings narrow that, both
+already on in `supabase/config.toml` for local:
+
+- **Secure password change** on (`secure_password_change = true`): a password
+  change needs a recent sign-in or reauthentication.
+- **Password changed notification** email on (template:
+  `supabase/templates/password_changed_notification.html`), so the owner hears
+  about any change, whichever way it was made.
 
 ## 2026-11-26 — Password reset links use `token_hash`, not the PKCE code
 

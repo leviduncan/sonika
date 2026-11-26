@@ -23,6 +23,11 @@ const TTL_SECONDS = 15 * 60;
 function signingKey(): Buffer | null {
   const dedicated = process.env.RECOVERY_COOKIE_SECRET;
   if (dedicated && dedicated.length >= 32) return Buffer.from(dedicated);
+  if (dedicated) {
+    console.warn(
+      "[auth] RECOVERY_COOKIE_SECRET is shorter than 32 characters and is ignored; using the key derived from SUPABASE_SERVICE_ROLE_KEY.",
+    );
+  }
 
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (serviceKey) {

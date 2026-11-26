@@ -2,7 +2,6 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 import * as z from "zod";
 import type { AuthError } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
@@ -100,18 +99,6 @@ const ResetPasswordSchema = z
     message: "Passwords don't match.",
   });
 
-/**
- * Origin the reset link should point back to. Prefer the request's own origin
- * (Next verifies it matches the host for Server Actions) so previews and local
- * ports work; Supabase still allow-lists the final redirect URL.
- */
-async function appOrigin() {
-  const h = await headers();
-  const origin = h.get("origin");
-  if (origin) return origin;
-  return (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/$/, "");
-}
-
 export async function requestPasswordReset(
   _prev: AuthState,
   formData: FormData,
@@ -127,9 +114,9 @@ export async function requestPasswordReset(
 
   const { email } = parsed.data;
   const supabase = await createClient();
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${await appOrigin()}/auth/confirm?next=/reset-password`,
-  });
+  // No redirectTo: the recovery template builds the link from the project's
+  // Site URL ({{ .SiteURL }}), never from anything in this request.
+  const { error } = await supabase.auth.resetPasswordForEmail(email);
 
   // Every outcome (sent, unknown email, rate limited, send failure) gets the
   // same answer, so the form can't be used to probe for accounts. Real

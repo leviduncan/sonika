@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import AuthShell from "@/components/auth/AuthShell";
-import { SubmitButton } from "@/components/auth/fields";
+import PendingSubmitButton from "@/components/auth/PendingSubmitButton";
 import { confirmRecovery } from "@/app/(auth)/actions";
 import { safeNext } from "@/lib/auth/redirect";
 
@@ -44,7 +44,7 @@ export default async function ConfirmPage({
       <form action={confirmRecovery} className="flex flex-col gap-4">
         <input type="hidden" name="token_hash" value={tokenHash} />
         <input type="hidden" name="next" value={safeNext(next)} />
-        <SubmitButton pending={false} label="Continue" />
+        <PendingSubmitButton label="Continue" />
       </form>
     </AuthShell>
   );
