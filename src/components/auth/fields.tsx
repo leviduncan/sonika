@@ -61,6 +61,16 @@ export function SubmitButton({ pending, label }: { pending: boolean; label: stri
   );
 }
 
+/** Inline success line (e.g. "check your inbox"). */
+export function FormNotice({ message }: { message?: string }) {
+  if (!message) return null;
+  return (
+    <div className="font-mono text-xs leading-relaxed text-accent" role="status">
+      {message}
+    </div>
+  );
+}
+
 /** Inline form error line. */
 export function FormError({ message }: { message?: string }) {
   return (

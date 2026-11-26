@@ -2,6 +2,106 @@
 
 Running log of why we chose what we chose. Newest first.
 
+## 2026-11-26 — Follow-up (not fixed): root `proxy.ts`
+
+**The root `proxy.ts` never runs.** The app lives in `src/app`, and Next 16
+only picks up the proxy file at the same level as `app` (so `src/proxy.ts`).
+`next build` lists no Proxy, and `.next/server/functions-config-manifest.json`
+has no `/_middleware` entry (a working `src/proxy.ts` produces one). Don't use
+`middleware-manifest.json` to check: it stays empty even when the proxy works.
+This predates password reset: the file has been in the wrong place since it
+was added in 149c3ef, and `main` has the same problem.
+
+Consequences today:
+
+- No per-request session refresh. Server Actions still save refreshed auth
+  cookies through `src/lib/supabase/server.ts`, but a refresh that happens while
+  a page renders is thrown away (Server Components can't set cookies).
+- `/dashboard` is protected only by each page's `requireProfile()` and by RLS.
+  The proxy's optimistic `/dashboard` redirect never fires.
+- The proxy's "signed-in users skip these" list does nothing.
+
+**`/forgot-password` is not in that list.** The password-reset branch first
+added it, then took it out. A user who opens a reset link is signed in, so once
+the proxy runs, listing `/forgot-password` would bounce them to the dashboard
+when their 15-minute recovery cookie expires, with no way to request a new link.
+
+**Fix (own branch, not part of password reset):** move `proxy.ts` to
+`src/proxy.ts`. Once it runs, the path-filter holes in its matcher become real
+and need fixing in the same change:
+
+- The negative lookahead `(?!api|_next/static|…)` isn't anchored to a path
+  segment, so it skips *any* path starting with `api` (e.g. `/apiary`), not
+  just `/api/*`.
+- The extension exclusion `.*\.(?:svg|png|jpg|…)$` applies to every path, so
+  `/dashboard/anything.png` would skip the session refresh and the `/dashboard`
+  gate. Anchor the exclusions (`api/`, `_next/static/`, …) and limit the
+  extension skip to public assets.
+
+## 2026-11-26 — Password reset hardening (review fixes)
+
+**Decision.** `/auth/confirm` is a page, not a GET route that verifies. GET only
+renders a "Continue" button; the `confirmRecovery` Server Action verifies the
+`token_hash` on POST. Only `type=recovery` is accepted, and the PKCE `?code=`
+fallback was removed (a code can't be checked for type before it's exchanged).
+`next` is an exact allowlist (`/reset-password`, `/dashboard`), anything else
+goes to `/dashboard`.
+
+**Why.** Email security scanners prefetch links and were able to burn the
+single-use token before the user clicked. A Server Action also gets Next's
+Origin check, so the POST can't be used for login CSRF. Prefix-based "is it
+relative?" checks keep missing browser quirks (`//host`, `/\t/host`), and an
+allowlist can't.
+
+**Recovery proof.** A recovery link and a password login produce the same kind
+of Supabase session, so the session alone can't gate a password change. After a
+successful recovery we set `sonika_recovery`: httpOnly, secure, sameSite=lax,
+15 minutes, HMAC-signed and bound to the user id (key: `RECOVERY_COOKIE_SECRET`,
+or derived from `SUPABASE_SERVICE_ROLE_KEY` when that isn't set). `updatePassword`
+verifies it server-side and clears it on success; password login and logout
+clear it too.
+
+**Also.** If signing out other devices fails after the password changes, the
+user is told and offered a retry (logged server-side), rather than sent to the
+dashboard as if all was well. The forgot form returns one message for every
+outcome, including rate limits and send failures; real errors are logged
+server-side only.
+
+**Prod prerequisite.** With the PKCE fallback gone, production reset links only
+work once `supabase/templates/recovery.html` is pasted into Supabase > Auth >
+Email Templates > Reset Password (the default template sends a `?code=` link).
+The link is built from `{{ .SiteURL }}`, so the production Site URL must be
+`https://trysonika.com`. The app no longer sends a `redirectTo` (it was built
+from the request's Origin header and the template ignored it anyway).
+
+**Required production settings (Supabase > Auth).** The recovery cookie only
+gates the app's own reset form. Supabase's session cookie is readable by the
+page and the anon key is public, so a signed-in session could still call
+Supabase's update-user endpoint directly. Two settings narrow that, both
+already on in `supabase/config.toml` for local:
+
+- **Secure password change** on (`secure_password_change = true`): a password
+  change needs a recent sign-in or reauthentication.
+- **Password changed notification** email on (template:
+  `supabase/templates/password_changed_notification.html`), so the owner hears
+  about any change, whichever way it was made.
+
+## 2026-11-26 — Password reset links use `token_hash`, not the PKCE code
+
+**Decision.** The reset email links to `/auth/confirm?token_hash=…&type=recovery`
+(custom Supabase template, `supabase/templates/recovery.html`), which calls
+`verifyOtp` server-side. (Superseded in part by the hardening entry above: the
+PKCE `?code=` fallback has since been removed.)
+
+**Why.** `@supabase/ssr` uses PKCE, and a PKCE code only exchanges in the
+browser that requested the email (the verifier lives in its cookies). Agency
+owners often request a reset on a laptop and open the email on a phone. The
+`token_hash` link works on any device.
+
+**Also.** The forgot form shows the same "on its way" message whether or not
+the email has an account (no account enumeration). A successful reset signs out
+the user's other sessions.
+
 ## 2026-06-27 — Per-seat Stripe billing & provisioning gate
 
 **Model.** One Stripe customer + one subscription per agency; the subscription's
