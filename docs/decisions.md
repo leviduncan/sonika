@@ -2,12 +2,62 @@
 
 Running log of why we chose what we chose. Newest first.
 
+## 2026-11-26 — Follow-up (not fixed): root `proxy.ts`
+
+The feat/password-reset review flagged an issue in the root `proxy.ts`. It is
+out of scope for the password-reset fix branch and is logged here so it isn't
+lost. What the current file does that needs a decision:
+
+- The matcher's negative lookahead `(?!api|_next/static|…)` isn't anchored to
+  a path segment, so it skips *any* path that starts with `api` (e.g. `/apiary`),
+  not just `/api/*`.
+- The extension exclusion `.*\.(?:svg|png|jpg|…)$` applies to every path, so
+  `/dashboard/anything.png` bypasses the proxy's session refresh and the
+  optimistic `/dashboard` gate. Pages still call `requireProfile()` and RLS is
+  the real boundary, so this isn't a data leak, but the gate shouldn't have holes.
+
+Fix on its own branch: anchor the exclusions (`api/`, `_next/static/`, …) and
+limit the extension skip to public assets.
+
+## 2026-11-26 — Password reset hardening (review fixes)
+
+**Decision.** `/auth/confirm` is a page, not a GET route that verifies. GET only
+renders a "Continue" button; the `confirmRecovery` Server Action verifies the
+`token_hash` on POST. Only `type=recovery` is accepted, and the PKCE `?code=`
+fallback was removed (a code can't be checked for type before it's exchanged).
+`next` is an exact allowlist (`/reset-password`, `/dashboard`), anything else
+goes to `/dashboard`.
+
+**Why.** Email security scanners prefetch links and were able to burn the
+single-use token before the user clicked. A Server Action also gets Next's
+Origin check, so the POST can't be used for login CSRF. Prefix-based "is it
+relative?" checks keep missing browser quirks (`//host`, `/\t/host`), and an
+allowlist can't.
+
+**Recovery proof.** A recovery link and a password login produce the same kind
+of Supabase session, so the session alone can't gate a password change. After a
+successful recovery we set `sonika_recovery`: httpOnly, secure, sameSite=lax,
+15 minutes, HMAC-signed and bound to the user id (key: `RECOVERY_COOKIE_SECRET`,
+or derived from `SUPABASE_SERVICE_ROLE_KEY` when that isn't set). `updatePassword`
+verifies it server-side and clears it on success; password login and logout
+clear it too.
+
+**Also.** If signing out other devices fails after the password changes, the
+user is told and offered a retry (logged server-side), rather than sent to the
+dashboard as if all was well. The forgot form returns one message for every
+outcome, including rate limits and send failures; real errors are logged
+server-side only.
+
+**Prod prerequisite.** With the PKCE fallback gone, production reset links only
+work once `supabase/templates/recovery.html` is pasted into Supabase > Auth >
+Email Templates > Reset Password (the default template sends a `?code=` link).
+
 ## 2026-11-26 — Password reset links use `token_hash`, not the PKCE code
 
 **Decision.** The reset email links to `/auth/confirm?token_hash=…&type=recovery`
 (custom Supabase template, `supabase/templates/recovery.html`), which calls
-`verifyOtp` server-side. `/auth/confirm` also accepts the default PKCE `?code=`
-link as a fallback.
+`verifyOtp` server-side. (Superseded in part by the hardening entry above: the
+PKCE `?code=` fallback has since been removed.)
 
 **Why.** `@supabase/ssr` uses PKCE, and a PKCE code only exchanges in the
 browser that requested the email (the verifier lives in its cookies). Agency

@@ -14,7 +14,9 @@ export default async function ForgotPasswordPage({
   const initialError =
     error === "link_expired"
       ? "That reset link is invalid or has expired. Request a new one below."
-      : undefined;
+      : error === "reset_unavailable"
+        ? "Password reset is temporarily unavailable. Try again shortly."
+        : undefined;
 
   return (
     <AuthShell

@@ -12,12 +12,14 @@ export default function ForgotPasswordForm({ initialError }: { initialError?: st
 
   return (
     <form action={action} className="flex flex-col gap-4">
+      {/* React resets the form after an action; defaultValue puts the email back. */}
       <Field
         label="Work email"
         name="email"
         type="email"
         placeholder="you@agency.com"
         autoComplete="email"
+        defaultValue={state?.email}
         required
       />
       <FormNotice message={state?.message} />

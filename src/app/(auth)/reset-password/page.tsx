@@ -3,16 +3,19 @@ import type { Metadata } from "next";
 import AuthShell from "@/components/auth/AuthShell";
 import ResetPasswordForm from "@/components/auth/ResetPasswordForm";
 import { getUser } from "@/lib/dal";
+import { hasValidRecoveryCookie } from "@/lib/auth/recovery-cookie";
 
 export const metadata: Metadata = { title: "Set a new password · Sonika" };
 
 /**
- * Reached from the reset email via /auth/confirm, which signs the user in
- * with a short-lived recovery session. No session means the link was never
- * opened, already used, or expired.
+ * Reached from the reset email via /auth/confirm, which signs the user in and
+ * sets a 15-minute recovery cookie. A plain signed-in session isn't enough:
+ * without the cookie the link was never opened here, already used, or expired.
+ * (`updatePassword` re-checks the cookie; this only picks which screen to show.)
  */
 export default async function ResetPasswordPage() {
-  const user = await getUser();
+  const sessionUser = await getUser();
+  const user = sessionUser && (await hasValidRecoveryCookie(sessionUser.id)) ? sessionUser : null;
 
   const footer = (
     <Link href="/login" className="text-accent transition-colors hover:text-foreground">
