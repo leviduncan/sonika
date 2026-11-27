@@ -8,16 +8,25 @@ const PROTECTED_PREFIXES = ["/dashboard"];
 const AUTH_ROUTES = ["/login", "/signup"];
 
 /**
- * Refreshes the Supabase auth session on every request and applies coarse
- * route protection. Called from the root `proxy.ts` (Next.js 16's renamed
+ * Refreshes the Supabase auth session on every matched request and applies
+ * coarse route protection. Called from `src/proxy.ts` (Next.js 16's renamed
  * Middleware). This keeps the session cookie fresh so Server Components and
  * Server Actions always see a valid user.
  *
  * Per the Next.js auth guidance, this is an *optimistic* check — the real
- * authorization boundary is RLS in Postgres plus per-page `requireUser()`.
+ * authorization boundary is RLS in Postgres plus `requireProfile()` in each
+ * protected page and Server Action.
  */
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
+  // Sent by @supabase/ssr with new session cookies, so that no shared cache
+  // stores the response and hands one user's session to another.
+  let noCacheHeaders: Record<string, string> = {};
+
+  const setHeaders = (target: NextResponse) =>
+    Object.entries(noCacheHeaders).forEach(([name, value]) =>
+      target.headers.set(name, value),
+    );
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,7 +36,7 @@ export async function updateSession(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet, headers) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value),
           );
@@ -35,6 +44,8 @@ export async function updateSession(request: NextRequest) {
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options),
           );
+          noCacheHeaders = headers;
+          setHeaders(response);
         },
       },
     },
@@ -49,18 +60,32 @@ export async function updateSession(request: NextRequest) {
   const isProtected = PROTECTED_PREFIXES.some((p) => path.startsWith(p));
   const isAuthRoute = AUTH_ROUTES.some((p) => path.startsWith(p));
 
+  // Only page loads are redirected. A Server Action is a POST to the page's own
+  // path, and redirecting it re-posts the action to a route that can't run it.
+  // Actions are let through to do their own auth checks.
+  if (request.method !== "GET" && request.method !== "HEAD") return response;
+
+  // A redirect is a new response, so it has to carry over whatever Supabase
+  // just set: refreshed or cleared session cookies and their headers.
+  const redirectTo = (url: URL) => {
+    const redirect = NextResponse.redirect(url);
+    response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+    setHeaders(redirect);
+    return redirect;
+  };
+
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("redirectedFrom", path);
-    return NextResponse.redirect(url);
+    return redirectTo(url);
   }
 
   if (user && isAuthRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     url.search = "";
-    return NextResponse.redirect(url);
+    return redirectTo(url);
   }
 
   return response;

@@ -2,7 +2,34 @@
 
 Running log of why we chose what we chose. Newest first.
 
-## 2026-11-26 — Follow-up (not fixed): root `proxy.ts`
+## 2026-11-26 — Proxy lives in `src/proxy.ts` (fixes the follow-up below)
+
+**Decision.** The proxy moved to `src/proxy.ts`, so it now runs. Turning it on
+exposed problems in code that had never executed, fixed in the same change:
+
+- **Matcher.** Every exclusion is anchored to the start of the path: `api/`,
+  `_next/static/`, `_next/image`, `fonts/`, the favicon and icon, and the two
+  social preview images. There is no blanket file-extension skip, so a new
+  public asset goes through the proxy until it is listed.
+- **Redirects keep the session.** Both redirects copy the cookies and no-cache
+  headers Supabase set during that request. Before, a refreshed or cleared
+  session was dropped.
+- **No shared caching of session cookies.** `setAll` applies the headers
+  `@supabase/ssr` passes. Without them, a prerendered page such as `/` went out
+  with new session cookies and `Cache-Control: s-maxage=31536000`.
+- **Only GET and HEAD are redirected.** A Server Action is a POST to the page's
+  own path. Redirecting it broke "Add client" for a user whose session was gone
+  (error page instead of `/login`). The proxy still refreshes the session on
+  POSTs.
+
+**Consequence.** The proxy is a convenience layer, not the authorization
+boundary: every protected page and Server Action must keep calling
+`requireProfile()` (or check the user itself), with RLS underneath.
+
+**Checking it.** `tests/auth/proxy.spec.ts`; `next build` should list
+`ƒ Proxy (Middleware)`.
+
+## 2026-11-26 — Follow-up (fixed above): root `proxy.ts`
 
 **The root `proxy.ts` never runs.** The app lives in `src/app`, and Next 16
 only picks up the proxy file at the same level as `app` (so `src/proxy.ts`).
