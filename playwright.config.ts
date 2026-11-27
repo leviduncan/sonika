@@ -10,6 +10,9 @@ const PORT = 3100;
  */
 export default defineConfig({
   testDir: "./tests",
+  // Aborts the run unless Supabase is local; restores it afterwards.
+  globalSetup: "./tests/support/global-setup.ts",
+  globalTeardown: "./tests/support/global-teardown.ts",
   timeout: 60_000,
   fullyParallel: false,
   workers: 1,

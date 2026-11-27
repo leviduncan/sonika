@@ -37,29 +37,36 @@ export type AgencyProfile = {
   agency: Agency;
 };
 
-/** Fetch the signed-in user's profile + their agency, or null if signed out. */
+/**
+ * Fetch the signed-in user's profile + their agency. Null means signed out or
+ * no profile row. A failed query throws: it says nothing about either.
+ */
 export const getProfile = cache(async (): Promise<AgencyProfile | null> => {
   const user = await getUser();
   if (!user) return null;
 
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("profiles")
     .select(
       "id, agency_id, email, full_name, role, agency:agencies(id, name, slug, stripe_customer_id, stripe_subscription_id, stripe_subscription_item_id, subscription_status)",
     )
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
 
-  return (data as AgencyProfile | null) ?? null;
+  if (error) throw new Error("Profile lookup failed", { cause: error });
+  return data as AgencyProfile | null;
 });
 
 /**
- * Guard for protected pages/actions. Redirects to /login when signed out, and
- * returns the resolved profile so callers don't re-query.
+ * Guard for protected pages/actions. Returns the resolved profile so callers
+ * don't re-query. Signed out goes to /login. Signed in without a profile goes
+ * to /account-unavailable: the proxy bounces signed-in users off /login, so
+ * sending them there would loop.
  */
 export const requireProfile = cache(async (): Promise<AgencyProfile> => {
+  if (!(await getUser())) redirect("/login");
   const profile = await getProfile();
-  if (!profile) redirect("/login");
+  if (!profile) redirect("/account-unavailable");
   return profile;
 });

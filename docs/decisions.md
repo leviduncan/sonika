@@ -2,6 +2,26 @@
 
 Running log of why we chose what we chose. Newest first.
 
+## 2026-11-27 — A signed-in user without a usable profile
+
+**Decision.** `requireProfile()` now tells three cases apart:
+
+- Signed out → `/login`.
+- Signed in, no profile row → `/account-unavailable`, a generic page with Sign
+  out. It is outside the proxy's auth and protected routes.
+- The profile query fails → it throws, and `src/app/error.tsx` shows generic
+  copy with "Try again" and "Sign out". No message, stack or ids are rendered.
+
+**Why.** All three used to go to `/login`. With the proxy running, a signed-in
+user is bounced from `/login` to `/dashboard`, so a missing profile looped until
+the browser gave up. The query uses `.maybeSingle()` because `.single()`
+reports a missing row as an error.
+
+**Testing.** The suite now changes the local database (revokes `select` on
+`profiles`, then restores it). `tests/support/local-supabase.ts` aborts the run
+unless both the API and the database (port 54322) are on this machine. `pg` is a
+new dev dependency for that connection.
+
 ## 2026-11-26 — Proxy lives in `src/proxy.ts` (fixes the follow-up below)
 
 **Decision.** The proxy moved to `src/proxy.ts`, so it now runs. Turning it on

@@ -33,3 +33,5 @@
 
 ## Backlog (post-MVP, not yet built)
 - **Edit agent / regenerate prompt.** The system prompt is generated once at provision time (Claude → stored as the Vapi assistant's system message + on seats.system_prompt) and never updated. No path to edit an agent or re-run Claude after a client's details change — today you'd remove + re-provision. Natural next feature for letting agencies tune their agents: edit the stored prompt and PATCH the Vapi assistant (and/or regenerate from an updated website).
+
+27/11/2026: Review fixes for the proxy branch (fix/proxy-location). (1) Redirect loop for a signed-in user with no profile: requireProfile now sends them to a new /account-unavailable page (generic copy, Sign out) and throws on a failed profile query, shown by a new src/app/error.tsx (generic copy, Try again, Sign out). tests/auth/no-profile.spec.ts (8 checks, all failed before the fix). The Playwright suite now aborts unless Supabase and its database are local, and restores anything it changes.
