@@ -73,6 +73,18 @@ test("signed out: the proxy redirects /dashboard paths to /login", async ({ requ
   expect(assetLike.status()).toBe(307);
 });
 
+test("signed out: paths that only start like /dashboard are not protected", async ({
+  request,
+}) => {
+  for (const url of ["/dashboardx", "/dashboard-old", "/dashboards/1"]) {
+    const res = await request.get(url, { maxRedirects: 0 });
+    expect(res.status(), url).toBe(404);
+  }
+
+  const below = await request.get("/dashboard/missing", { maxRedirects: 0 });
+  expect(below.status()).toBe(307);
+});
+
 test("signed out: public and auth pages are served, not redirected", async ({ request }) => {
   for (const url of [
     "/",
@@ -207,6 +219,20 @@ test.describe("with a signed-in user", () => {
       expect(res.status(), path).toBe(307);
       expect(res.headers().location, path).toMatch(/\/dashboard$/);
     }
+  });
+
+  test("signed in: paths that only start like /login or /signup are left alone", async ({
+    page,
+    context,
+  }) => {
+    await signIn(page);
+    for (const path of ["/login-help", "/loginx", "/signup-info"]) {
+      const res = await context.request.get(path, { maxRedirects: 0 });
+      expect(res.status(), path).toBe(404);
+    }
+
+    const below = await context.request.get("/login/missing", { maxRedirects: 0 });
+    expect(below.status()).toBe(307);
   });
 
   test("the redirect off /login keeps the refreshed session", async ({ page, context }) => {

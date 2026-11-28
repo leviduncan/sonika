@@ -2,6 +2,12 @@
 
 Running log of why we chose what we chose. Newest first.
 
+## 2026-11-27 — Proxy routes match whole path segments
+
+**Decision.** A path is protected, or an auth route, only if it equals the route
+or sits under it (`/dashboard`, `/dashboard/x`). `/dashboardx` and
+`/login-help` are ordinary paths.
+
 ## 2026-11-27 — `/login` is rendered per request
 
 **Decision.** The login page calls `connection()`, so it is never prerendered.

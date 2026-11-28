@@ -8,6 +8,11 @@ const PROTECTED_PREFIXES = ["/dashboard"];
 // recovery cookie expires they must still be able to request a new link.
 const AUTH_ROUTES = ["/login", "/signup"];
 
+// Whole path segments only: `/dashboard/x` is under `/dashboard`, `/dashboardx`
+// is not.
+const isUnder = (path: string, routes: string[]) =>
+  routes.some((route) => path === route || path.startsWith(`${route}/`));
+
 /**
  * Refreshes the Supabase auth session on every matched request and applies
  * coarse route protection. Called from `src/proxy.ts` (Next.js 16's renamed
@@ -70,8 +75,8 @@ export async function updateSession(request: NextRequest) {
   const { user } = result.data;
 
   const path = request.nextUrl.pathname;
-  const isProtected = PROTECTED_PREFIXES.some((p) => path.startsWith(p));
-  const isAuthRoute = AUTH_ROUTES.some((p) => path.startsWith(p));
+  const isProtected = isUnder(path, PROTECTED_PREFIXES);
+  const isAuthRoute = isUnder(path, AUTH_ROUTES);
 
   // Only page loads are redirected. A Server Action is a POST to the page's own
   // path, and redirecting it re-posts the action to a route that can't run it.
