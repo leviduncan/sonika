@@ -249,6 +249,53 @@ test.describe("with a signed-in user", () => {
   });
 
   // Server Actions are POSTs to the page's own path, so the proxy sees them too.
+  // When one redirects, Next copies the target page's headers onto its response,
+  // so /login must never be marked as publicly cacheable.
+
+  /** Runs `act` and returns the headers of the Server Action response it causes. */
+  async function actionHeaders(page: Page, act: () => Promise<void>) {
+    const [response] = await Promise.all([
+      page.waitForResponse((res) => res.request().headers()["next-action"] !== undefined),
+      act(),
+    ]);
+    return response.allHeaders();
+  }
+
+  for (const expired of [false, true]) {
+    test(`the sign-out response is not cacheable (${expired ? "expired" : "current"} session)`, async ({
+      page,
+      context,
+    }) => {
+      await signIn(page);
+      // Wait out the link prefetches, so none refreshes the session mid-test.
+      await page.goto("/dashboard", { waitUntil: "networkidle" });
+      if (expired) await expireSession(context);
+
+      const headers = await actionHeaders(page, () =>
+        page.getByRole("button", { name: /Sign out/ }).click(),
+      );
+      expect(headers["set-cookie"]).toContain("-auth-token");
+      expect(headers["cache-control"]).toContain("no-store");
+      expect(headers["cache-control"]).not.toMatch(/s-maxage|public/);
+      await expect(page).toHaveURL(/\/login$/);
+    });
+  }
+
+  test("an action that sends a lost session to /login is not cacheable", async ({
+    page,
+    context,
+  }) => {
+    await signIn(page);
+    await page.getByRole("button", { name: /Add client/ }).click();
+    await page.getByLabel("Client name").fill("Bayside Dental");
+    await context.clearCookies();
+
+    const headers = await actionHeaders(page, () =>
+      page.getByRole("button", { name: /Create/ }).click(),
+    );
+    expect(headers["cache-control"]).toContain("no-store");
+    expect(headers["cache-control"]).not.toMatch(/s-maxage|public/);
+  });
 
   test("Sign out with a lost session lands on /login", async ({ page, context }) => {
     await signIn(page);

@@ -2,6 +2,21 @@
 
 Running log of why we chose what we chose. Newest first.
 
+## 2026-11-27 — `/login` is rendered per request
+
+**Decision.** The login page calls `connection()`, so it is never prerendered.
+
+**Why.** When a Server Action redirects, Next copies the target page's headers
+onto the action response, overriding the proxy's. Sign out therefore answered
+`303` with `Set-Cookie` and `Cache-Control: s-maxage=31536000`. A Server Action
+has no way to set that header itself, so the fix belongs on the target page. It
+also covers the other actions that redirect to `/login`.
+
+**Cost.** One server render per `/login` request, with no data fetching.
+
+**Watch for.** The same applies to any action that sets cookies and redirects to
+a prerendered page. Today's other targets are already rendered per request.
+
 ## 2026-11-27 — Supabase calls give up after 3 seconds
 
 **Decision.** `src/lib/supabase/deadline.ts` gives a client one 3 s budget. An
