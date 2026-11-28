@@ -2,9 +2,11 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import * as z from "zod";
 import type { AuthError } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { createDeadline } from "@/lib/supabase/deadline";
 import { safeNext } from "@/lib/auth/redirect";
 import {
   clearRecoveryCookie,
@@ -274,9 +276,27 @@ export async function signOutOtherDevices(): Promise<AuthState> {
   redirect("/dashboard");
 }
 
+/** Drops this browser's Supabase session cookies without calling Supabase. */
+async function clearSessionCookies() {
+  const cookieStore = await cookies();
+  for (const { name } of cookieStore.getAll()) {
+    if (/^sb-.+-auth-token/.test(name)) cookieStore.delete(name);
+  }
+}
+
 export async function logout() {
-  const supabase = await createClient();
-  await supabase.auth.signOut();
+  const limit = createDeadline();
+  const supabase = await createClient(limit);
+  const signedOut = await limit.within(supabase.auth.signOut()).then(
+    ({ error }) => !error,
+    () => false,
+  );
+  // Supabase keeps the cookies when it can't revoke the session, which would
+  // leave this browser signed in. The server-side session may outlive this.
+  if (!signedOut) {
+    console.warn("[auth] sign out unconfirmed; clearing this browser's session");
+    await clearSessionCookies();
+  }
   await clearRecoveryCookie();
   revalidatePath("/", "layout");
   redirect("/login");

@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { createDeadline, isAuthUnavailable } from "@/lib/supabase/deadline";
 
 const PROTECTED_PREFIXES = ["/dashboard"];
 // Signed-in users skip these. /reset-password and /forgot-password are
@@ -16,6 +17,9 @@ const AUTH_ROUTES = ["/login", "/signup"];
  * Per the Next.js auth guidance, this is an *optimistic* check — the real
  * authorization boundary is RLS in Postgres plus `requireProfile()` in each
  * protected page and Server Action.
+ *
+ * If Supabase doesn't give an answer within the deadline, the request passes
+ * through with no redirect either way, and the session is left as it was.
  */
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -28,15 +32,20 @@ export async function updateSession(request: NextRequest) {
       target.headers.set(name, value),
     );
 
+  const limit = createDeadline();
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      global: { fetch: limit.fetch },
       cookies: {
         getAll() {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet, headers) {
+          // Too late: the request has moved on. Writes made in time are kept.
+          if (limit.signal.aborted) return;
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value),
           );
@@ -52,9 +61,13 @@ export async function updateSession(request: NextRequest) {
   );
 
   // IMPORTANT: do not run code between createServerClient and getUser().
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Null means no answer in time (or a thrown error): unknown, not signed out.
+  const result = await limit.within(supabase.auth.getUser()).catch(() => null);
+  if (!result || isAuthUnavailable(result.error)) {
+    console.warn("[auth] session check unavailable; passing the request through");
+    return response;
+  }
+  const { user } = result.data;
 
   const path = request.nextUrl.pathname;
   const isProtected = PROTECTED_PREFIXES.some((p) => path.startsWith(p));

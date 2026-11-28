@@ -64,11 +64,17 @@ function assertLocalDocker() {
   if (!/^(npipe|unix):/.test(endpoint)) refuse("the Docker engine is not local.");
 
   const apiPort = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).port;
-  if (!docker("port", GATEWAY_CONTAINER, "8000").includes(`:${apiPort}`)) {
-    refuse(`${GATEWAY_CONTAINER} does not serve port ${apiPort}.`);
-  }
-  if (!docker("port", DB_CONTAINER, "5432").includes(`:${DB_PORT}`)) {
-    refuse(`${DB_CONTAINER} does not serve port ${DB_PORT}.`);
+  assertPublishes(GATEWAY_CONTAINER, "8000/tcp", apiPort);
+  assertPublishes(DB_CONTAINER, "5432/tcp", DB_PORT);
+}
+
+/** Reads the configured binding: `docker port` fails on a paused container. */
+function assertPublishes(container: string, containerPort: string, hostPort: string) {
+  const bindings = JSON.parse(
+    docker("inspect", "--format", "{{json .HostConfig.PortBindings}}", container),
+  ) as Record<string, { HostPort: string }[] | undefined>;
+  if (!bindings[containerPort]?.some((binding) => binding.HostPort === hostPort)) {
+    refuse(`${container} does not serve port ${hostPort}.`);
   }
 }
 
@@ -106,6 +112,24 @@ export async function restoreProfilesRead() {
       error,
     );
   }
+}
+
+/**
+ * Makes profile queries hang while auth keeps working. The lock lives in an open
+ * transaction, so it is released even if the test process dies.
+ */
+export async function lockProfiles(): Promise<() => Promise<void>> {
+  assertLocalSupabase();
+  const client = new Client({ connectionString: dbUrl(), connectionTimeoutMillis: 5000 });
+  await client.connect();
+  await client.query("BEGIN");
+  await client.query("LOCK TABLE public.profiles IN ACCESS EXCLUSIVE MODE");
+  let released = false;
+  return async () => {
+    if (released) return;
+    released = true;
+    await client.end(); // closing the connection rolls the transaction back
+  };
 }
 
 const isPaused = () =>

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { logout } from "@/app/(auth)/actions";
 import AuthShell from "@/components/auth/AuthShell";
 import SignOutButton from "@/components/auth/SignOutButton";
-import { getProfile, getUser } from "@/lib/dal";
+import { getAccount } from "@/lib/dal";
 
 export const metadata: Metadata = { title: "Account unavailable · Sonika" };
 
@@ -13,8 +13,9 @@ export const metadata: Metadata = { title: "Account unavailable · Sonika" };
  * and it shows no account details.
  */
 export default async function AccountUnavailablePage() {
-  if (!(await getUser())) redirect("/login");
-  if (await getProfile()) redirect("/dashboard");
+  const { user, profile } = await getAccount();
+  if (!user) redirect("/login");
+  if (profile) redirect("/dashboard");
 
   return (
     <AuthShell

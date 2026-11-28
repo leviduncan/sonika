@@ -2,6 +2,33 @@
 
 Running log of why we chose what we chose. Newest first.
 
+## 2026-11-27 — Supabase calls give up after 3 seconds
+
+**Decision.** `src/lib/supabase/deadline.ts` gives a client one 3 s budget. An
+answer that doesn't arrive, a network error, a 5xx or a 429 is "unknown", which
+is never read as signed in or signed out.
+
+- **Proxy.** Unknown passes the request through with no redirect, so public
+  pages still render. Cookies saved before the deadline are kept; later writes
+  are ignored. It logs one warning with no user data.
+- **Page checks** (`src/lib/dal.ts`, so also `requireProfile()` inside Server
+  Actions). Unknown throws and shows the error page. Pages and actions use
+  protected data only after `requireProfile()` returns.
+- **Sign out.** If Supabase doesn't confirm in time, this browser's session
+  cookies are deleted anyway. The server-side session is not revoked then.
+- **Everything else** (sign in, sign up, password reset actions) has no limit yet.
+
+**Why.** auth-js retries a failed refresh for about 30 s, so `/` took 25–33 s
+during an outage. Aborting the request doesn't stop the retries, so the deadline
+stops waiting on its own.
+
+**Worst case.** A protected page can take about 6 s to show the error: 3 s in the
+proxy, then 3 s in the page check.
+
+**Refresh tokens.** A render can refresh a token but can't save it. On local
+Supabase, reusing the old token 12 s and 24 s later returned the same new token,
+so the next request recovers. Hosted Supabase has not been checked.
+
 ## 2026-11-27 — A signed-in user without a usable profile
 
 **Decision.** `requireProfile()` now tells three cases apart:

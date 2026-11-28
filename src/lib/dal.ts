@@ -2,21 +2,35 @@ import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import {
+  createDeadline,
+  isAuthUnavailable,
+  SupabaseUnavailableError,
+} from "@/lib/supabase/deadline";
 
 /**
  * Data Access Layer. The single place server code asks "who is this user and
  * what agency are they in?". `cache()` dedupes the lookups within one render
  * pass. RLS is the real isolation boundary; these helpers are the convenience
  * + redirect layer on top of it.
+ *
+ * The lookups give up after a few seconds and throw, which shows the error
+ * page. "Unknown" is never read as signed in or as signed out.
  */
 
-export const getUser = cache(async () => {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user;
-});
+/** One client and one time budget for the lookups behind a page or action. */
+async function connect() {
+  const limit = createDeadline();
+  return { limit, supabase: await createClient(limit) };
+}
+
+async function readUser({ limit, supabase }: Awaited<ReturnType<typeof connect>>) {
+  const { data, error } = await limit.within(supabase.auth.getUser());
+  if (isAuthUnavailable(error)) throw new SupabaseUnavailableError({ cause: error });
+  return error ? null : data.user;
+}
+
+export const getUser = cache(async () => readUser(await connect()));
 
 export type Agency = {
   id: string;
@@ -38,24 +52,28 @@ export type AgencyProfile = {
 };
 
 /**
- * Fetch the signed-in user's profile + their agency. Null means signed out or
- * no profile row. A failed query throws: it says nothing about either.
+ * The signed-in user and their profile + agency. `profile` is null when signed
+ * out or when there is no profile row. A failed query throws: it says nothing
+ * about either.
  */
-export const getProfile = cache(async (): Promise<AgencyProfile | null> => {
-  const user = await getUser();
-  if (!user) return null;
+export const getAccount = cache(async () => {
+  const connection = await connect();
+  const user = await readUser(connection);
+  if (!user) return { user: null, profile: null };
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("profiles")
-    .select(
-      "id, agency_id, email, full_name, role, agency:agencies(id, name, slug, stripe_customer_id, stripe_subscription_id, stripe_subscription_item_id, subscription_status)",
-    )
-    .eq("id", user.id)
-    .maybeSingle();
+  // Same client as above, so the query carries any session just refreshed.
+  const { data, error } = await connection.limit.within(
+    connection.supabase
+      .from("profiles")
+      .select(
+        "id, agency_id, email, full_name, role, agency:agencies(id, name, slug, stripe_customer_id, stripe_subscription_id, stripe_subscription_item_id, subscription_status)",
+      )
+      .eq("id", user.id)
+      .maybeSingle(),
+  );
 
   if (error) throw new Error("Profile lookup failed", { cause: error });
-  return data as AgencyProfile | null;
+  return { user, profile: data as AgencyProfile | null };
 });
 
 /**
@@ -65,8 +83,8 @@ export const getProfile = cache(async (): Promise<AgencyProfile | null> => {
  * sending them there would loop.
  */
 export const requireProfile = cache(async (): Promise<AgencyProfile> => {
-  if (!(await getUser())) redirect("/login");
-  const profile = await getProfile();
+  const { user, profile } = await getAccount();
+  if (!user) redirect("/login");
   if (!profile) redirect("/account-unavailable");
   return profile;
 });
